@@ -1,0 +1,19 @@
+tnfuse
+======
+
+tnfuse is a FUSE daemon for the Spectranet's TNFS.
+"What's FUSE?"
+	Filesystem in USErspace (http://fuse.sourceforge.net)
+"What's the Spectranet?"
+	A project to get the Sinclair ZX Spectrum online through an Ethernet adapter (http://spectrum.alioth.net)
+"What's TNFS?"
+	The Trivial Network File System, designed by winston for use on the Spectranet (http://spectrum.alioth.net/svn/filedetails.php?repname=Spectranet&path=%2Ftrunk%2Ftnfs%2Ftnfs-protocol.txt)
+
+Running tnfuse
+	You can either run the daemon directly:
+	./tnfuse <server> / <mountpoint> [-d] -o default_permissions <options>
+	or by using the wrapper script run-tnfuse:
+	./run-tnfuse <server> <mountpoint>
+
+	If tnfuse crashes, you may have to manually unmount it:
+	fusermount -uz <mountpoint>
