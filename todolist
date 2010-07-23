@@ -20,3 +20,7 @@ Hang Bug when not -d:
 	If the -d option is not given, any processes attempting to read from the
 	mounted FS will hang.  It's rather hard to fix a bug which can only be
 	reproduced when debugging is disabled :(
+Retries of Possibly-Dropped Packets:
+	Since TNFS runs over UDP, packets can and will be dropped.  tnfuse needs
+	to retry if a response doesn't come back within a set time.
+	The correct place to do this is probably in dbg_send().

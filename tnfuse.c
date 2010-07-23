@@ -57,6 +57,7 @@ inline unsigned short leshort(unsigned char * data);
 inline unsigned long lelong(unsigned char * data);
 void leeshort(unsigned short data, unsigned char *buf);
 void leelong(unsigned long data, unsigned char *buf);
+signed int decode(unsigned short sessid, unsigned char ern, unsigned char ecmd, char * oper); // decode a header and assert it matches the relevant stuff.  oper is used in error reporting and should be the name of the relevant syscall
 
 unsigned char rn;
 unsigned short sessid=0;
@@ -82,31 +83,8 @@ static int tnfs_getattr(const char *path, struct stat *stbuf)
 		usleep(25000); // lazily done delay-spin-loop
 	}
 	// << 0xBEEF 0x00 0x24 status(1) mode(2) uid(2) gid(2) size(4) atime(4) mtime(4) ctime(4) uidstring(nt) gidstring(nt)
-	unsigned short rsessid = *(unsigned short *)rbox[ern];
-	if(rsessid!=sessid)
-	{
-		free(rbox[ern]);
-		rbox[ern]=NULL;
-		fprintf(stderr, "tnfuse: getattr: sessid mismatch.  EIO\n");
-		return(-EIO);
-	}
-	unsigned char rrn=rbox[ern][2];
-	if(rrn!=ern)
-	{
-		free(rbox[ern]);
-		rbox[ern]=NULL;
-		fprintf(stderr, "tnfuse: getattr: rrn/ern mismatch.  EIO\n");
-		return(-EIO);
-	}
-	unsigned char cmd=rbox[ern][3];
-	if(cmd!=TNFS_STATFILE)
-	{
-		free(rbox[ern]);
-		rbox[ern]=NULL;
-		fprintf(stderr, "tnfuse: getattr: cmd mismatch.  EIO\n");
-		return(-EIO);
-	}
-	unsigned char status=rbox[ern][4];
+	unsigned char status=decode(sessid, ern, TNFS_STATFILE, "getattr");
+	if(status<0) return(status);
 	if(status!=TNFS_SUCCESS)
 	{
 		free(rbox[ern]);
@@ -167,31 +145,8 @@ static int tnfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off
 		usleep(25000); // lazily done delay-spin-loop
 	}
 	// << 0xBEEF 0x00 0x10 0x00 handle(1) - success, handle provided
-	unsigned short rsessid = *(unsigned short *)rbox[ern];
-	if(rsessid!=sessid)
-	{
-		free(rbox[ern]);
-		rbox[ern]=NULL;
-		fprintf(stderr, "tnfuse: readdir: sessid mismatch.  EIO\n");
-		return(-EIO);
-	}
-	unsigned char rrn=rbox[ern][2];
-	if(rrn!=ern)
-	{
-		free(rbox[ern]);
-		rbox[ern]=NULL;
-		fprintf(stderr, "tnfuse: readdir: rrn/ern mismatch.  EIO\n");
-		return(-EIO);
-	}
-	unsigned char cmd=rbox[ern][3];
-	if(cmd!=TNFS_OPENDIR)
-	{
-		free(rbox[ern]);
-		rbox[ern]=NULL;
-		fprintf(stderr, "tnfuse: readdir: cmd mismatch.  EIO\n");
-		return(-EIO);
-	}
-	unsigned char status=rbox[ern][4];
+	unsigned char status=decode(sessid, ern, TNFS_OPENDIR, "readdir");
+	if(status<0) return(status);
 	if(status!=TNFS_SUCCESS)
 	{
 		free(rbox[ern]);
@@ -226,31 +181,8 @@ static int tnfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off
 		}
 		// << 0xBEEF 0x00 0x11 name(nt) - directory entry OR
 		// << 0xBEEF 0x00 0x11 0x00 ERR - error
-		rsessid = *(unsigned short *)rbox[ern];
-		if(rsessid!=sessid)
-		{
-			free(rbox[ern]);
-			rbox[ern]=NULL;
-			fprintf(stderr, "tnfuse: readdir: sessid mismatch.  EIO\n");
-			return(-EIO);
-		}
-		rrn=rbox[ern][2];
-		if(rrn!=ern)
-		{
-			free(rbox[ern]);
-			rbox[ern]=NULL;
-			fprintf(stderr, "tnfuse: readdir: rrn/ern mismatch.  EIO\n");
-			return(-EIO);
-		}
-		cmd=rbox[ern][3];
-		if(cmd!=TNFS_READDIR)
-		{
-			free(rbox[ern]);
-			rbox[ern]=NULL;
-			fprintf(stderr, "tnfuse: readdir: cmd mismatch.  EIO\n");
-			return(-EIO);
-		}
-		status=rbox[ern][4];
+		status=decode(sessid, ern, TNFS_READDIR, "readdir");
+		if(status<0) return(status);
 		switch(status)
 		{
 			case TNFS_SUCCESS:
@@ -393,31 +325,8 @@ static int tnfs_open(const char *path, struct fuse_file_info *fi)
 		usleep(25000); // lazily done delay-spin-loop
 	}
 	// << 0xBEEF 0x00 0x20 status(1) [fd(1)]
-	unsigned short rsessid = *(unsigned short *)rbox[ern];
-	if(rsessid!=sessid)
-	{
-		free(rbox[ern]);
-		rbox[ern]=NULL;
-		fprintf(stderr, "tnfuse: open: sessid mismatch.  EIO\n");
-		return(-EIO);
-	}
-	unsigned char rrn=rbox[ern][2];
-	if(rrn!=ern)
-	{
-		free(rbox[ern]);
-		rbox[ern]=NULL;
-		fprintf(stderr, "tnfuse: open: rrn/ern mismatch.  EIO\n");
-		return(-EIO);
-	}
-	unsigned char cmd=rbox[ern][3];
-	if(cmd!=TNFS_OPENFILE)
-	{
-		free(rbox[ern]);
-		rbox[ern]=NULL;
-		fprintf(stderr, "tnfuse: open: cmd mismatch.  EIO\n");
-		return(-EIO);
-	}
-	unsigned char status=rbox[ern][4];
+	unsigned char status=decode(sessid, ern, TNFS_OPENFILE, "open");
+	if(status<0) return(status);
 	if(status!=TNFS_SUCCESS)
 	{
 		free(rbox[ern]);
@@ -461,31 +370,8 @@ static int tnfs_read(const char *path, char *buf, size_t size, off_t offset, str
 			usleep(25000); // lazily done delay-spin-loop
 		}
 		// << 0xBEEF 0x00 0x21 status(1) [size(2le) data(size)]
-		unsigned short rsessid = *(unsigned short *)rbox[ern];
-		if(rsessid!=sessid)
-		{
-			free(rbox[ern]);
-			rbox[ern]=NULL;
-			fprintf(stderr, "tnfuse: read: sessid mismatch.  EIO\n");
-			return(-EIO);
-		}
-		unsigned char rrn=rbox[ern][2];
-		if(rrn!=ern)
-		{
-			free(rbox[ern]);
-			rbox[ern]=NULL;
-			fprintf(stderr, "tnfuse: read: rrn/ern mismatch.  EIO\n");
-			return(-EIO);
-		}
-		unsigned char cmd=rbox[ern][3];
-		if(cmd!=TNFS_READBLOCK)
-		{
-			free(rbox[ern]);
-			rbox[ern]=NULL;
-			fprintf(stderr, "tnfuse: read: cmd mismatch.  EIO\n");
-			return(-EIO);
-		}
-		unsigned char status=rbox[ern][4];
+		unsigned char status=decode(sessid, ern, TNFS_READBLOCK, "open");
+		if(status<0) return(status);
 		if(status!=TNFS_SUCCESS)
 		{
 			free(rbox[ern]);
@@ -525,6 +411,42 @@ static int tnfs_write(const char *path, const char *buf, size_t size, off_t offs
 	return(-ENOSYS);
 }
 
+static int tnfs_release(const char *path, struct fuse_file_info *fi)
+{
+	// >> 0xBEEF 0x00 0x23 fd(1)
+	char sdata[5];
+	unsigned char ern=rn;
+	header(sdata, TNFS_CLOSEFILE);
+	sdata[4]=fi->fh;
+	if(rbox[ern])
+		free(rbox[ern]);
+	rbox[ern]=NULL;
+	dbg_send(fd, sdata, 5, 0);
+	while(rbox[ern]==NULL)
+	{
+		usleep(25000); // lazily done delay-spin-loop
+	}
+	// << 0xBEEF 0x00 0x23 status(1)
+	unsigned char status=decode(sessid, ern, TNFS_CLOSEFILE, "release");
+	if(status<0) return(status);
+	if(status!=TNFS_SUCCESS)
+	{
+		free(rbox[ern]);
+		rbox[ern]=NULL;
+		if(status<TNFS_E_MAX)
+		{
+			fprintf(stderr, "tnfuse: release: error %02x->%d, %s\n", status, err_to_sys[status], strerror(err_to_sys[status]));
+			return(-err_to_sys[status]);
+		}
+		else
+		{
+			fprintf(stderr, "tnfuse: release: error %02x.  EIO\n", status);
+			return(-EIO);
+		}
+	}
+	return(0);
+}
+
 static int tnfs_statfs(const char *path, struct statvfs *stbuf)
 {
 	fprintf(stderr, "tnfuse: statfs: ENOSYS\n");
@@ -550,6 +472,7 @@ static struct fuse_operations tnfs_oper = {
 	.open		= tnfs_open,
 	.read		= tnfs_read,
 	.write		= tnfs_write,
+	.release	= tnfs_release,
 	.statfs		= tnfs_statfs,
 };
 
@@ -797,4 +720,34 @@ void leelong(unsigned long data, unsigned char *buf)
 	buf[2]=(data>>16)%(1<<8);
 	buf[1]=(data>>8)%(1<<8);
 	buf[0]=data%(1<<8);
+}
+
+signed int decode(unsigned short sessid, unsigned char ern, unsigned char ecmd, char * oper)
+{
+	unsigned short rsessid = *(unsigned short *)rbox[ern];
+	if(rsessid!=sessid)
+	{
+		free(rbox[ern]);
+		rbox[ern]=NULL;
+		fprintf(stderr, "tnfuse: %s: sessid mismatch.  EIO\n", oper);
+		return(-EIO);
+	}
+	unsigned char rrn=rbox[ern][2];
+	if(rrn!=ern)
+	{
+		free(rbox[ern]);
+		rbox[ern]=NULL;
+		fprintf(stderr, "tnfuse: %s: rrn/ern mismatch.  EIO\n", oper);
+		return(-EIO);
+	}
+	unsigned char cmd=rbox[ern][3];
+	if(cmd!=ecmd)
+	{
+		free(rbox[ern]);
+		rbox[ern]=NULL;
+		fprintf(stderr, "tnfuse: %s: cmd mismatch.  EIO\n", oper);
+		return(-EIO);
+	}
+	unsigned char status=rbox[ern][4];
+	return(status);
 }
