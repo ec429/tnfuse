@@ -1,0 +1,17 @@
+/* tnfs command IDs */
+#define TNFS_MOUNT	0x00
+#define TNFS_UMOUNT	0x01
+
+#define TNFS_OPENDIR	0x10
+#define TNFS_READDIR	0x11
+#define TNFS_CLOSEDIR	0x12
+
+#define TNFS_OPENFILE	0x20
+#define	TNFS_READBLOCK	0x21
+#define TNFS_WRITEBLOCK	0x22
+#define TNFS_CLOSEFILE	0x23
+#define TNFS_STATFILE	0x24
+#define TNFS_SEEKFILE	0x25
+#define TNFS_UNLINKFILE	0x26
+#define TNFS_CHMODFILE	0x27
+#define TNFS_RENAMEFILE	0x28

@@ -1,0 +1,2 @@
+#!/bin/sh
+./tnfuse $1 / $2 -d -o default_permissions

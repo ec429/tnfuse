@@ -1,0 +1,22 @@
+Things TODO:
+
+EAGAIN back-off times:
+	"The server can also ask the client to back off. If a server can operate
+	with interrupts enabled while the physical disc is busy, and therefore
+	still be able to process requests, it can tell the client that it is busy
+	and to try again later. In this case, the EAGAIN error code will be
+	returned for whatever command was being tried, and following the error
+	code, will be a 16 bit little endian value giving how long to back off in
+	milliseconds."
+Thread-Safe Stack Thread:
+	The stack thread and service threads both use and free() rbox[] entries;
+	this needs to be locked with mutexes to avoid a nasty race condition bug.
+	In connection with this, also want better waiting implementation for the
+	service threads (which currently spin sleep(1)).
+Dylan's Broken Spec:
+	Talk to winston about all the places where the TNFS spec != tnfsd, find
+	out which is wrong in each case.
+Hang Bug when not -d:
+	If the -d option is not given, any processes attempting to read from the
+	mounted FS will hang.  It's rather hard to fix a bug which can only be
+	reproduced when debugging is disabled :(
