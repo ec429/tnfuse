@@ -40,6 +40,8 @@
 #include "config.h"
 #include "flags.h"
 
+#define min(a,b)	((a)<(b)?(a):(b))
+
 typedef struct string
 {
 	char * data;
@@ -53,6 +55,8 @@ void header(char *data, int cmd);
 void * stackfn(void *);
 inline unsigned short leshort(unsigned char * data);
 inline unsigned long lelong(unsigned char * data);
+void leeshort(unsigned short data, unsigned char *buf);
+void leelong(unsigned long data, unsigned char *buf);
 
 unsigned char rn;
 unsigned short sessid=0;
@@ -439,8 +443,80 @@ static int tnfs_open(const char *path, struct fuse_file_info *fi)
 
 static int tnfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
-	fprintf(stderr, "tnfuse: : ENOSYS\n");
-	return(-ENOSYS);
+	size_t bytes=0;
+	while(bytes<size)
+	{
+		// >> 0xBEEF 0x00 0x21 fd(1) size(2le)
+		char sdata[7];
+		unsigned char ern=rn;
+		header(sdata, TNFS_READBLOCK);
+		sdata[4]=fi->fh;
+		leeshort(size-bytes, sdata+5);
+		if(rbox[ern])
+			free(rbox[ern]);
+		rbox[ern]=NULL;
+		dbg_send(fd, sdata, 7, 0);
+		while(rbox[ern]==NULL)
+		{
+			usleep(25000); // lazily done delay-spin-loop
+		}
+		// << 0xBEEF 0x00 0x21 status(1) [size(2le) data(size)]
+		unsigned short rsessid = *(unsigned short *)rbox[ern];
+		if(rsessid!=sessid)
+		{
+			free(rbox[ern]);
+			rbox[ern]=NULL;
+			fprintf(stderr, "tnfuse: read: sessid mismatch.  EIO\n");
+			return(-EIO);
+		}
+		unsigned char rrn=rbox[ern][2];
+		if(rrn!=ern)
+		{
+			free(rbox[ern]);
+			rbox[ern]=NULL;
+			fprintf(stderr, "tnfuse: read: rrn/ern mismatch.  EIO\n");
+			return(-EIO);
+		}
+		unsigned char cmd=rbox[ern][3];
+		if(cmd!=TNFS_READBLOCK)
+		{
+			free(rbox[ern]);
+			rbox[ern]=NULL;
+			fprintf(stderr, "tnfuse: read: cmd mismatch.  EIO\n");
+			return(-EIO);
+		}
+		unsigned char status=rbox[ern][4];
+		if(status!=TNFS_SUCCESS)
+		{
+			free(rbox[ern]);
+			rbox[ern]=NULL;
+			if(status==TNFS_EOF)
+			{
+				size=0;
+			}
+			else if(status<TNFS_E_MAX)
+			{
+				fprintf(stderr, "tnfuse: read: error %02x->%d, %s\n", status, err_to_sys[status], strerror(err_to_sys[status]));
+				return(-err_to_sys[status]);
+			}
+			else
+			{
+				fprintf(stderr, "tnfuse: read: error %02x.  EIO\n", status);
+				return(-EIO);
+			}
+		}
+		else
+		{
+			unsigned short length=leshort(rbox[ern]+5);
+			if(bytes+length>size)
+			{
+				fprintf(stderr, "tnfuse: read: warning - long count returned by server\n");
+			}
+			memcpy(buf+bytes, rbox[ern]+7, min(length, size-bytes));
+			bytes+=length;
+		}
+	}
+	return(bytes);
 }
 
 static int tnfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
@@ -707,4 +783,18 @@ inline unsigned short leshort(unsigned char * data)
 inline unsigned long lelong(unsigned char * data)
 {
 	return(data[0]+(data[1]<<8)+(data[2]<<16)+(data[3]<<24));
+}
+
+void leeshort(unsigned short data, unsigned char *buf)
+{
+	buf[1]=(data>>8)%(1<<8);
+	buf[0]=data%(1<<8);
+}
+
+void leelong(unsigned long data, unsigned char *buf)
+{
+	buf[3]=(data>>24)%(1<<8);
+	buf[2]=(data>>16)%(1<<8);
+	buf[1]=(data>>8)%(1<<8);
+	buf[0]=data%(1<<8);
 }
