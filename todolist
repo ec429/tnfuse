@@ -12,7 +12,7 @@ Thread-Safe Stack Thread:
 	The stack thread and service threads both use and free() rbox[] entries;
 	this needs to be locked with mutexes to avoid a nasty race condition bug.
 	In connection with this, also want better waiting implementation for the
-	service threads (which currently spin sleep(1)).
+	service threads (which currently spin usleep(25000)).
 Dylan's Broken Spec:
 	Talk to winston about all the places where the TNFS spec != tnfsd, find
 	out which is wrong in each case.
@@ -24,3 +24,6 @@ Retries of Possibly-Dropped Packets:
 	Since TNFS runs over UDP, packets can and will be dropped.  tnfuse needs
 	to retry if a response doesn't come back within a set time.
 	The correct place to do this is probably in dbg_send().
+Remember Current Offset:
+	Each file descriptor needs to have its offset stored, so we don't have to
+	seek when it's not necessary.  This will save network roundtrips.

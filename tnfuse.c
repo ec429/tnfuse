@@ -352,6 +352,39 @@ static int tnfs_open(const char *path, struct fuse_file_info *fi)
 
 static int tnfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
+	// Seek to required offset
+	// >> 0xBEEF 0x00 0x25 fd(1) type(1) offset(4le)
+	char sdata[10];
+	unsigned char ern=rn;
+	header(sdata, TNFS_SEEKFILE);
+	sdata[4]=fi->fh;
+	sdata[5]=TNFS_SEEK_SET;
+	leelong(offset, sdata+6);
+	if(rbox[ern])
+		free(rbox[ern]);
+	rbox[ern]=NULL;
+	dbg_send(fd, sdata, 10, 0);
+	while(rbox[ern]==NULL)
+	{
+		usleep(25000); // lazily done delay-spin-loop
+	}
+	// << 0xBEEF 0x00 0x25 status(1)
+	unsigned char status=decode(sessid, ern, TNFS_SEEKFILE, "read");
+	if(status!=TNFS_SUCCESS)
+	{
+		free(rbox[ern]);
+		rbox[ern]=NULL;
+		if(status<TNFS_E_MAX)
+		{
+			fprintf(stderr, "tnfuse: read: error %02x->%d, %s\n", status, err_to_sys[status], strerror(err_to_sys[status]));
+			return(-err_to_sys[status]);
+		}
+		else
+		{
+			fprintf(stderr, "tnfuse: read: error %02x.  EIO\n", status);
+			return(-EIO);
+		}
+	}
 	size_t bytes=0;
 	while(bytes<size)
 	{
@@ -370,7 +403,7 @@ static int tnfs_read(const char *path, char *buf, size_t size, off_t offset, str
 			usleep(25000); // lazily done delay-spin-loop
 		}
 		// << 0xBEEF 0x00 0x21 status(1) [size(2le) data(size)]
-		unsigned char status=decode(sessid, ern, TNFS_READBLOCK, "open");
+		unsigned char status=decode(sessid, ern, TNFS_READBLOCK, "read");
 		if(status<0) return(status);
 		if(status!=TNFS_SUCCESS)
 		{
